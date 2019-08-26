@@ -50,6 +50,8 @@ class LoginGui(QDialog):
         user_name = self.ui.leUserName.text()
         pass_user = self.ui.lePassword.text()
         options = {'server': 'http://localhost:2990/jira'}
+        # options = {'server': 'http://jira.icterra.com:8443'}
+
         self.ui.btnConnect.setText('Not Connected !')
         try:
             jiraMy = JIRA(options, basic_auth=(user_name, pass_user))
