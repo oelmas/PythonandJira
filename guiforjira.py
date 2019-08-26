@@ -8,7 +8,6 @@ from jira import JIRA, JIRAError
 
 
 class LoginGui(QDialog):
-
     def __init__(self):
         super().__init__()
         self.ui = Ui_Dialog()
@@ -34,6 +33,7 @@ class LoginGui(QDialog):
         finally:
 
             if isconnected:
+                projects = jiraMy.projects()
                 self.ui.btnConnect.setText('Connected !')
                 self.ui.lvProjects.addItems([projects.name for projects in projects])
 
@@ -41,15 +41,23 @@ class LoginGui(QDialog):
                 self.ui.lvUsers.addItems([user.name for user in users])
 
     def getUserIssues(self):
+        global issues
         try:
             prj = self.ui.lvProjects.currentItem().text()
             print([prj])
             usr = self.ui.lvUsers.currentItem().text()
             print([usr])
-            query_issues = 'project = {}  AND assignee = {}'.format(prj, usr)
-            issues = jiraMy.search_issues(query_issues)
+            query_issues = "assignee = {}".format(usr)
+
+            block_size = 100
+            block_num = 0
+            issues = jiraMy.search_issues(query_issues,startAt = block_num * block_size, maxResults = block_size,fields = "issuetype, created, resolutiondate, reporter, assignee, status")
         except JIRAError as je:
             print(je.status_code, je.text)
+        finally:
+            if len(issues) > 0:
+                print([issue.fields.created for issue in issues])
+
 
 
 if __name__ == "__main__":
