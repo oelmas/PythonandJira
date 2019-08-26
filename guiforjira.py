@@ -94,7 +94,7 @@ class LoginGui(QDialog):
             block_size = 100
             block_num = 0
             issues = jiraMy.search_issues(query_issues, startAt=block_num * block_size, maxResults=block_size,
-                                          fields="issuetype, created, duedate, resolutiondate, reporter, assignee, status")
+                                          fields="project, issuetype, created, duedate, resolutiondate, reporter, assignee, status")
         except JIRAError as je:
             print(je.status_code, je.text)
         finally:
@@ -102,11 +102,11 @@ class LoginGui(QDialog):
             if len(issues) > 0:
 
                 for issue in issues:
-
                     d = {
                         'key': issue.key,
                         'assignee': issue.fields.assignee,
                         # 'creator': issue.fields.creator,
+                        'project': issue.fields.project.name,
                         'reporter': issue.fields.reporter,
                         'created': issue.fields.created.split('T')[0],
                         'duedate': issue.fields.duedate,
@@ -133,6 +133,34 @@ class LoginGui(QDialog):
                         allpersonal_issues['created'])
                     allpersonal_issues['Planned Work'] = allpersonal_issues['Planned Work'] / np.timedelta64(1, 'D')
 
+                model = pandasModel(allpersonal_issues)
+                self.ui.tbvIssuesOfUser.setModel(model)
+            else:
+                d = {
+                    'key': '',
+                    'assignee': '',
+                    # 'creator': issue.fields.creator,
+                    'project': '',
+                    'reporter': '',
+                    'created': '',
+                    'duedate': '',
+                    # 'components': issue.fields.components,
+                    # 'description': issue.fields.description,
+                    # 'summary': issue.fields.summary,
+                    # 'fixVersions': issue.fields.fixVersions,
+                    'subtask': '',
+                    'issuetype': '',
+                    # 'priority': issue.fields.priority.name,
+                    # 'resolution': issue.fields.resolution,
+                    'resolution.date': '',
+                    'status.name': '',
+                    'status.description': '',
+                    # 'updated': issue.fields.updated,
+                    # 'versions': issue.fields.versions,
+                    # 'watches': issue.fields.watches.watchCount,
+                    # 'storypoints': issue.fields.customfield_10142
+                }
+                allpersonal_issues = allpersonal_issues.append(d, ignore_index=True)
                 model = pandasModel(allpersonal_issues)
                 self.ui.tbvIssuesOfUser.setModel(model)
 
