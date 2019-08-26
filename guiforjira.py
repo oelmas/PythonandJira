@@ -5,6 +5,13 @@ import sys
 from PyQt5.QtWidgets import QDialog, QApplication
 from login import *
 from jira import JIRA, JIRAError
+from time import strftime
+
+
+def calculate_works(datetime1, datetime2):
+    arg1 = datetime1.strptime(datetime1,'%Y-%m-%dT%H:%M:%S.%f%z')
+    arg2 = datetime1.strptime(datetime2,'%Y-%m-%dT%H:%M:%S.%f%z')
+    result = arg2 - arg1
 
 
 class LoginGui(QDialog):
@@ -27,7 +34,7 @@ class LoginGui(QDialog):
             jiraMy = JIRA(options, basic_auth=(user_name, pass_user))
         except JIRAError as je:
             if je.status_code == 401:
-                self.ui.lbConnectionStatus.setText("Cannot connect. Check ur name and pass {}".format(je.text))
+                self.ui.lbConnectionStatus.setText("Cannot connect. Check your name and pass {}".format(je.text))
                 self.ui.btnConnect.setText('Try Again!')
                 isconnected = False
         finally:
@@ -47,17 +54,23 @@ class LoginGui(QDialog):
             print([prj])
             usr = self.ui.lvUsers.currentItem().text()
             print([usr])
-            query_issues = "assignee = {}".format(usr)
+
+            startDate_year, startDate_month, startDate_day = self.ui.calStartDate.selectedDate().getDate()
+            startDate_str = '{0}-{1}-{2}'.format(startDate_year, startDate_month, startDate_day)
+            dueDate_year, dueDate_month, dueDate_day = self.ui.calDueDate.selectedDate().getDate()
+            dueDate_str = '{0}-{1}-{2}'.format(dueDate_year, dueDate_month, dueDate_day)
+
+            query_issues = "assignee = {} AND created > {} AND duedate < {} ".format(usr, startDate_str, dueDate_str)
 
             block_size = 100
             block_num = 0
-            issues = jiraMy.search_issues(query_issues,startAt = block_num * block_size, maxResults = block_size,fields = "issuetype, created, resolutiondate, reporter, assignee, status")
+            issues = jiraMy.search_issues(query_issues, startAt=block_num * block_size, maxResults=block_size,fields="issuetype, created, duedate, resolutiondate, reporter, assignee, status")
         except JIRAError as je:
             print(je.status_code, je.text)
         finally:
             if len(issues) > 0:
-                print([issue.fields.created for issue in issues])
 
+                print([calculate_works(issue.fields.created, issue.fields.duedate) for issue in issues])
 
 
 if __name__ == "__main__":
