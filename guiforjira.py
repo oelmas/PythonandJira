@@ -3,7 +3,7 @@
 import sys
 
 from PyQt5.QtWidgets import QDialog, QApplication, QTableView
-from PyQt5.QtCore import QAbstractTableModel, Qt
+from PyQt5.QtCore import QAbstractTableModel, Qt, QDate
 from login import *
 from jira import JIRA, JIRAError
 from datetime import datetime
@@ -86,9 +86,11 @@ class LoginGui(QDialog):
             usr = self.ui.lvUsers.currentItem().text()
             print([usr])
 
-            startDate_year, startDate_month, startDate_day = self.ui.calStartDate.selectedDate().getDate()
+
+            startDate_year, startDate_month, startDate_day = self.ui.deStartDate.calendarWidget().selectedDate().getDate()
+
             startDate_str = '{0}-{1}-{2}'.format(startDate_year, startDate_month, startDate_day)
-            dueDate_year, dueDate_month, dueDate_day = self.ui.calDueDate.selectedDate().getDate()
+            dueDate_year, dueDate_month, dueDate_day = self.ui.deDueDate.calendarWidget().selectedDate().getDate()
             dueDate_str = '{0}-{1}-{2}'.format(dueDate_year, dueDate_month, dueDate_day)
 
             query_issues = "assignee = {} AND created > {} AND duedate < {} ".format(usr, startDate_str, dueDate_str)
