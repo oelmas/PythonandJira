@@ -38,7 +38,6 @@ class pandasModel(QAbstractTableModel):
 
 class LoginGui(QDialog):
 
-
     def __init__(self):
         super().__init__()
         completer = QCompleter()
@@ -68,9 +67,6 @@ class LoginGui(QDialog):
         finally:
 
             if isconnected:
-
-
-
                 projects = jiraMy.projects()
 
                 self.ui.btnConnect.setText('Connected !')
@@ -87,7 +83,9 @@ class LoginGui(QDialog):
 
     def getUserIssues(self):
         global issues
-        allpersonal_issues = pd.DataFrame()
+        allpersonal_issues = pd.DataFrame() # issue DTO d which is Dictionary
+        alluser = pd.DataFrame() # prepare user DTO
+
         global model
         try:
             prj = self.ui.lvProjects.currentItem().text()
@@ -145,7 +143,7 @@ class LoginGui(QDialog):
                     for t in range(allpersonal_issues.shape[0]):
                         try:
                             allpersonal_issues['Planned Work'].iloc[t] = np.busday_count(
-                                allpersonal_issues['created'].iloc[t], allpersonal_issues['duedate'].iloc[t]) + 1
+                                allpersonal_issues.iloc[t, allpersonal_issues.columns.get_loc('created')], allpersonal_issues.iloc[t, allpersonal_issues.columns.get_loc('duedate')]) + 1
                         except Exception as e:
                             print(e)
 
