@@ -85,8 +85,6 @@ class Ui_Dialog(object):
         self.horizontalLayout_6 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_6.setObjectName("horizontalLayout_6")
         self.tbvIssuesOfUser = QtWidgets.QTableView(Dialog)
-        self.tbvIssuesOfUser.setAlternatingRowColors(True)
-        self.tbvIssuesOfUser.setSortingEnabled(True)
         self.tbvIssuesOfUser.setObjectName("tbvIssuesOfUser")
         self.horizontalLayout_6.addWidget(self.tbvIssuesOfUser)
         self.verticalLayout_7 = QtWidgets.QVBoxLayout()
