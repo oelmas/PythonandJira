@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 
 import sys
-
-from PyQt5.QtWidgets import QDialog, QApplication, QTableView
-from PyQt5.QtCore import QAbstractTableModel, Qt, QDate
-from login import *
-from jira import JIRA, JIRAError
 from datetime import datetime
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+from PyQt5.QtCore import QAbstractTableModel, Qt
+from PyQt5.QtWidgets import QDialog, QApplication, QCompleter
+from jira import JIRA, JIRAError
+
+from login import *
 
 
 class pandasModel(QAbstractTableModel):
@@ -36,8 +37,11 @@ class pandasModel(QAbstractTableModel):
 
 
 class LoginGui(QDialog):
+
+
     def __init__(self):
         super().__init__()
+        completer = QCompleter()
         self.ui = Ui_Dialog()
         self.ui.setupUi(self)
         self.ui.btnConnect.clicked.connect(self.connect2jira)
@@ -58,12 +62,17 @@ class LoginGui(QDialog):
         except JIRAError as je:
             if je.status_code == 401:
                 self.ui.lbConnectionStatus.setText("Cannot connect. Check your name and pass {}".format(je.text))
+                self.ui.lbConnectionStatus.setBackgroundRole()
                 self.ui.btnConnect.setText('Try Again!')
                 isconnected = False
         finally:
 
             if isconnected:
+
+
+
                 projects = jiraMy.projects()
+
                 self.ui.btnConnect.setText('Connected !')
                 self.ui.lvProjects.addItems([projects.name for projects in projects])
 
@@ -85,7 +94,6 @@ class LoginGui(QDialog):
             print([prj])
             usr = self.ui.lvUsers.currentItem().text()
             print([usr])
-
 
             startDate_year, startDate_month, startDate_day = self.ui.deStartDate.calendarWidget().selectedDate().getDate()
 
@@ -114,6 +122,7 @@ class LoginGui(QDialog):
                         'reporter': issue.fields.reporter,
                         'created': issue.fields.created.split('T')[0],
                         'duedate': issue.fields.duedate,
+                        'Planned Work': '',
                         # 'components': issue.fields.components,
                         # 'description': issue.fields.description,
                         # 'summary': issue.fields.summary,
@@ -133,9 +142,12 @@ class LoginGui(QDialog):
 
                     allpersonal_issues = allpersonal_issues.append(d, ignore_index=True)
 
-                    allpersonal_issues['Planned Work'] = pd.to_datetime(allpersonal_issues['duedate']) - pd.to_datetime(
-                        allpersonal_issues['created'])
-                    allpersonal_issues['Planned Work'] = allpersonal_issues['Planned Work'] / np.timedelta64(1, 'D')
+                    for t in range(allpersonal_issues.shape[0]):
+                        try:
+                            allpersonal_issues['Planned Work'].iloc[t] = np.busday_count(
+                                allpersonal_issues['created'].iloc[t], allpersonal_issues['duedate'].iloc[t]) + 1
+                        except Exception as e:
+                            print(e)
 
                 model = pandasModel(allpersonal_issues)
                 self.ui.tbvIssuesOfUser.setModel(model)

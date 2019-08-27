@@ -53,7 +53,11 @@
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="lePassword"/>
+        <widget class="QLineEdit" name="lePassword">
+         <property name="echoMode">
+          <enum>QLineEdit::Password</enum>
+         </property>
+        </widget>
        </item>
        <item>
         <spacer name="horizontalSpacer_3">
@@ -92,6 +96,9 @@
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
+         </property>
+         <property name="autoFillBackground">
+          <bool>true</bool>
          </property>
          <property name="text">
           <string/>
@@ -140,6 +147,9 @@
           <string>Users</string>
          </property>
         </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="leUserSelect"/>
        </item>
        <item>
         <widget class="QListWidget" name="lvUsers"/>
