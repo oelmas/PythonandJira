@@ -2,12 +2,14 @@
 
 import sys
 from datetime import datetime
+from select import select
 
 import numpy as np
 import pandas as pd
 from PyQt5.QtCore import QAbstractTableModel, Qt
 from PyQt5.QtWidgets import QDialog, QApplication, QCompleter
 from jira import JIRA, JIRAError
+from sphinx.addnodes import index
 
 from login import *
 
@@ -38,26 +40,41 @@ class pandasModel(QAbstractTableModel):
 
 class LoginGui(QDialog):
 
+    # jiraMy: JIRA
+
     def __init__(self):
         super().__init__()
-        completer = QCompleter()
+
+        self.dfProject = pd.DataFrame()
+        self.modelP = pandasModel(self.dfProject)
+        self.dfUser = pd.DataFrame()
+        self.projects = []
+        self.users = []
+        self.isconnected = False
+        self.jiraMy: JIRA
+
         self.ui = Ui_Dialog()
         self.ui.setupUi(self)
         self.ui.btnConnect.clicked.connect(self.connect2jira)
         self.ui.btnGetIssues.clicked.connect(self.getUserIssues)
+        self.ui.cbProjects.activated.connect(self.changeditem)
         self.show()
 
     def connect2jira(self):
-        global jiraMy
-        isconnected = True
+
+        # isconnected = True
+        completerUsr = QCompleter()
+
         user_name = self.ui.leUserName.text()
         pass_user = self.ui.lePassword.text()
         options = {'server': 'http://localhost:2990/jira'}
         # options = {'server': 'http://jira.icterra.com:8443'}
 
         self.ui.btnConnect.setText('Not Connected !')
+        # global jiraMy
         try:
-            jiraMy = JIRA(options, basic_auth=(user_name, pass_user))
+            self.jiraMy = JIRA(options, basic_auth=(user_name, pass_user))
+            info = self.jiraMy.server_info()
         except JIRAError as je:
             if je.status_code == 401:
                 self.ui.lbConnectionStatus.setText("Cannot connect. Check your name and pass {}".format(je.text))
@@ -65,26 +82,109 @@ class LoginGui(QDialog):
                 self.ui.btnConnect.setText('Try Again!')
                 isconnected = False
         finally:
+            self.isconnected = True
+            if self.isconnected:
+                # global jiraMy
+                self.projects = self.jiraMy.projects()
 
-            if isconnected:
-                projects = jiraMy.projects()
+                try:
+                    if len(self.projects) > 0:
+                        for project in self.projects:
+                            d = {
+                                'key': project.key,
+                                'name': project.name,
+                                'id': project.id
+                            }
+                            self.dfProject = self.dfProject.append(d, ignore_index=True)
+                    else:
+                        d = {
+                            'key': '',
+                            'name': '',
+                            'id': ''
+                        }
+                        self.dfProject = self.dfProject.append(d, ignore_index=True)
+
+                    self.modelP = pandasModel(self.dfProject)
+
+                    # self.users = jiraMy.search_users('.', maxResults=20)
+                    # if len(self.users) > 0:
+                    #     for user in self.users:
+                    #         d = {
+                    #             'key': user.key,
+                    #             'name': user.name,
+                    #             'displayName': user.displayName
+                    #         }
+                    #         try:
+                    #             self.dfUser = self.dfUser.append(d, ignore_index=True)
+                    #         except Exception as e:
+                    #             print(e)
+                    # else:
+                    #     d = {
+                    #         'key': '',
+                    #         'name': '',
+                    #         'displayName': ''
+                    #     }
+                    #     self.dfUser = self.dfUser.append(d, ignore_index=True)
+                    # modelU = pandasModel(self.dfUser)
+
+                except Exception as e:
+                    print(e)
+
+                # completerUsr.setModel(modelU)
+                # completerUsr.caseSensitivity(Qt.CaseInsensitive())
+                # completerUsr.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
+                # self.ui.leUserSelect.setCompleter(completerUsr)
+
+                self.ui.cbProjects.setModel(self.modelP)
+                self.ui.cbProjects.setModelColumn(2)
 
                 self.ui.btnConnect.setText('Connected !')
-                self.ui.lvProjects.addItems([projects.name for projects in projects])
 
-                users = jiraMy.search_users('.')
-                self.ui.lvUsers.addItems([user.name for user in users])
+    def changeditem(self):
+        # global jiraMy
+        if self.isconnected:
+            indx = self.ui.cbProjects.currentIndex()
+            key = self.dfProject.iloc[indx]['key']
 
-    def calculate_works(self, datetime1, datetime2):
-        arg1 = datetime.strptime(datetime1, '%Y-%m-%dT%H:%M:%S.%f%z')
-        arg2 = datetime.strptime(datetime2, '%Y-%m-%dT%H:%M:%S.%f%z')
-        result = arg2 - arg1
-        return result.days, result.mins, result.seconds
+            tmpUserDf = pd.DataFrame()
+
+            issue_query = "project = {}".format(key)
+            block_size = 100
+            block_num = 0
+
+            while True:
+                start_idx = block_num * block_size
+                try:
+                    issuesUser = self.jiraMy.search_issues(issue_query, start_idx, maxResults=block_size)
+
+                except Exception as je:
+                    print(je)
+                if len(issuesUser) == 0:
+                    break
+                block_num += 1
+                for issue in issuesUser:
+                    d = {
+                        'key': issue.key,
+                        'assignee': issue.fields.assignee,
+                        'creator': issue.fields.creator,
+                        'project': issue.fields.project.name,
+                        'reporter': issue.fields.reporter
+                    }
+                    tmpUserDf = tmpUserDf.append(d, ignore_index=True)
+
+                tmpUserDf = tmpUserDf.drop_duplicates(subset='assignee')
+                tmpUserModel = pandasModel(tmpUserDf)
+
+            try:
+                self.ui.lvUsers.setModel(tmpUserModel)
+            except Exception as ex:
+                print(ex)
+            self.ui.lvUsers.setModelColumn(0)
 
     def getUserIssues(self):
         global issues
-        allpersonal_issues = pd.DataFrame() # issue DTO d which is Dictionary
-        alluser = pd.DataFrame() # prepare user DTO
+        allpersonal_issues = pd.DataFrame()  # issue DTO d which is Dictionary
+        alluser = pd.DataFrame()  # prepare user DTO
 
         global model
         try:
@@ -103,8 +203,8 @@ class LoginGui(QDialog):
 
             block_size = 100
             block_num = 0
-            issues = jiraMy.search_issues(query_issues, startAt=block_num * block_size, maxResults=block_size,
-                                          fields="project, issuetype, created, duedate, resolutiondate, reporter, assignee, status")
+            issues = self.jiraMy.search_issues(query_issues, startAt=block_num * block_size, maxResults=block_size,
+                                               fields="project, issuetype, created, duedate, resolutiondate, reporter, assignee, status")
         except JIRAError as je:
             print(je.status_code, je.text)
         finally:
@@ -143,7 +243,8 @@ class LoginGui(QDialog):
                     for t in range(allpersonal_issues.shape[0]):
                         try:
                             allpersonal_issues['Planned Work'].iloc[t] = np.busday_count(
-                                allpersonal_issues.iloc[t, allpersonal_issues.columns.get_loc('created')], allpersonal_issues.iloc[t, allpersonal_issues.columns.get_loc('duedate')]) + 1
+                                allpersonal_issues.iloc[t, allpersonal_issues.columns.get_loc('created')],
+                                allpersonal_issues.iloc[t, allpersonal_issues.columns.get_loc('duedate')]) + 1
                         except Exception as e:
                             print(e)
 
