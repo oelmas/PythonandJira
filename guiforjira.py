@@ -50,6 +50,8 @@ class LoginGui(QDialog):
         self.dfUser = pd.DataFrame()
         self.projects = []
         self.users = []
+
+        self.allpersonal_issues = pd.DataFrame()  # issue DTO d which is Dictionary
         self.isconnected = False
         self.jiraMy: JIRA
 
@@ -58,6 +60,7 @@ class LoginGui(QDialog):
         self.ui.btnConnect.clicked.connect(self.connect2jira)
         self.ui.btnGetIssues.clicked.connect(self.getUserIssues)
         self.ui.cbProjects.activated.connect(self.changeditem)
+        self.ui.btnImportExcel.clicked.connect(self.import2excel)
         self.show()
 
     def connect2jira(self):
@@ -106,34 +109,8 @@ class LoginGui(QDialog):
 
                     self.modelP = pandasModel(self.dfProject)
 
-                    # self.users = jiraMy.search_users('.', maxResults=20)
-                    # if len(self.users) > 0:
-                    #     for user in self.users:
-                    #         d = {
-                    #             'key': user.key,
-                    #             'name': user.name,
-                    #             'displayName': user.displayName
-                    #         }
-                    #         try:
-                    #             self.dfUser = self.dfUser.append(d, ignore_index=True)
-                    #         except Exception as e:
-                    #             print(e)
-                    # else:
-                    #     d = {
-                    #         'key': '',
-                    #         'name': '',
-                    #         'displayName': ''
-                    #     }
-                    #     self.dfUser = self.dfUser.append(d, ignore_index=True)
-                    # modelU = pandasModel(self.dfUser)
-
                 except Exception as e:
                     print(e)
-
-                # completerUsr.setModel(modelU)
-                # completerUsr.caseSensitivity(Qt.CaseInsensitive())
-                # completerUsr.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
-                # self.ui.leUserSelect.setCompleter(completerUsr)
 
                 self.ui.cbProjects.setModel(self.modelP)
                 self.ui.cbProjects.setModelColumn(2)
@@ -183,35 +160,35 @@ class LoginGui(QDialog):
 
     def getUserIssues(self):
         global issues
-        allpersonal_issues = pd.DataFrame()  # issue DTO d which is Dictionary
-        alluser = pd.DataFrame()  # prepare user DTO
 
         global model
         try:
-            prj = self.ui.lvProjects.currentItem().text()
-            print([prj])
-            usr = self.ui.lvUsers.currentItem().text()
-            print([usr])
+            usr = self.ui.lvUsers.selectedIndexes()
 
             startDate_year, startDate_month, startDate_day = self.ui.deStartDate.calendarWidget().selectedDate().getDate()
-
             startDate_str = '{0}-{1}-{2}'.format(startDate_year, startDate_month, startDate_day)
             dueDate_year, dueDate_month, dueDate_day = self.ui.deDueDate.calendarWidget().selectedDate().getDate()
             dueDate_str = '{0}-{1}-{2}'.format(dueDate_year, dueDate_month, dueDate_day)
 
-            query_issues = "assignee = {} AND created > {} AND duedate < {} ".format(usr, startDate_str, dueDate_str)
+            listIssue = []
+            for s in usr:
+                itemtext = s.data(Qt.DisplayRole)
+                query_issues = "assignee = \'{}\' AND created > {} AND duedate < {} ".format(itemtext, startDate_str,
+                                                                                             dueDate_str)
 
-            block_size = 100
-            block_num = 0
-            issues = self.jiraMy.search_issues(query_issues, startAt=block_num * block_size, maxResults=block_size,
-                                               fields="project, issuetype, created, duedate, resolutiondate, reporter, assignee, status")
+                block_size = 100
+                block_num = 0
+                issues = self.jiraMy.search_issues(query_issues, startAt=block_num * block_size, maxResults=block_size,
+                                                   fields="project, issuetype, created, duedate, resolutiondate, reporter, assignee, status")
+                for i in issues:
+                    listIssue.append(i)
         except JIRAError as je:
             print(je.status_code, je.text)
         finally:
 
             if len(issues) > 0:
 
-                for issue in issues:
+                for issue in listIssue:
                     d = {
                         'key': issue.key,
                         'assignee': issue.fields.assignee,
@@ -238,17 +215,17 @@ class LoginGui(QDialog):
                         # 'storypoints': issue.fields.customfield_10142
                     }
 
-                    allpersonal_issues = allpersonal_issues.append(d, ignore_index=True)
+                    self.allpersonal_issues = self.allpersonal_issues.append(d, ignore_index=True)
 
-                    for t in range(allpersonal_issues.shape[0]):
+                    for t in range(self.allpersonal_issues.shape[0]):
                         try:
-                            allpersonal_issues['Planned Work'].iloc[t] = np.busday_count(
-                                allpersonal_issues.iloc[t, allpersonal_issues.columns.get_loc('created')],
-                                allpersonal_issues.iloc[t, allpersonal_issues.columns.get_loc('duedate')]) + 1
+                            self.allpersonal_issues['Planned Work'].iloc[t] = np.busday_count(
+                                self.allpersonal_issues.iloc[t, self.allpersonal_issues.columns.get_loc('created')],
+                                self.allpersonal_issues.iloc[t, self.allpersonal_issues.columns.get_loc('duedate')]) + 1
                         except Exception as e:
                             print(e)
 
-                model = pandasModel(allpersonal_issues)
+                model = pandasModel(self.allpersonal_issues)
                 self.ui.tbvIssuesOfUser.setModel(model)
             else:
                 d = {
@@ -275,9 +252,14 @@ class LoginGui(QDialog):
                     # 'watches': issue.fields.watches.watchCount,
                     # 'storypoints': issue.fields.customfield_10142
                 }
-                allpersonal_issues = allpersonal_issues.append(d, ignore_index=True)
-                model = pandasModel(allpersonal_issues)
+                self.allpersonal_issues = self.allpersonal_issues.append(d, ignore_index=True)
+                model = pandasModel(self.allpersonal_issues)
                 self.ui.tbvIssuesOfUser.setModel(model)
+
+    def import2excel(self):
+        if len(self.allpersonal_issues) > 0:
+            export_xl = self.allpersonal_issues.to_excel(r'/home/oelmas/PycharmProjects/PythonandJira/export_df.xlsx',
+                                                         index=None, header=True)
 
 
 if __name__ == "__main__":
